@@ -1,4 +1,5 @@
-import { MODE1_EXERCISES, MODE1_SESSIONS, WEEK_VOLUME } from './mode1';
+import { EXERCISES_BY_ID } from '../catalog';
+import { MODE1_SESSIONS, WEEK_VOLUME } from './mode1';
 import type { DayKey, PlannedSession, ProgramWeek } from './types';
 
 const DAYS: DayKey[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -17,7 +18,7 @@ export function getTodayPlan(date: Date, week: number): PlannedSession {
   const session = MODE1_SESSIONS[day];
   const volume = WEEK_VOLUME[programWeek];
   const items = session.items.map((item) => {
-    const kind = MODE1_EXERCISES[item.exerciseId].kind;
+    const kind = EXERCISES_BY_ID[item.exerciseId].kind;
     if (item.exerciseId === 'walk') return { ...item, minutes: volume.cardioMin };
     if (kind === 'strength') return { ...item, sets: volume.sets, reps: volume.repsMin };
     return { ...item };

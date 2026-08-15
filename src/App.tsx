@@ -9,16 +9,19 @@ import { FreeSessionBuilder } from './features/free-session/FreeSessionBuilder';
 import { createFreePlan } from './features/free-session/freeSession';
 import { ReadinessCheck } from './components/ReadinessCheck';
 import { exportBackup, importBackup } from './persistence/backup';
-import type { ActiveSession, AppSettings, SessionLog } from './persistence/db';
+import type { ActiveSession, AppSettings, ExercisePreference, SessionLog } from './persistence/db';
 import { repository } from './persistence/repository';
 import { getTodayPlan } from './domain/schedule';
 import { SessionRunner } from './session/SessionRunner';
-import type { FreeSessionTemplate, JournalEntry, TahajjudEntry } from './domain/types';
+import type { EquipmentId, FreeSessionTemplate, JournalEntry, PlannedSession, TahajjudEntry } from './domain/types';
 import { Journal } from './features/journal/Journal';
 import { Tahajjud } from './features/tahajjud/Tahajjud';
 import { Reminders } from './features/reminders/Reminders';
 import { More, type MoreView } from './features/more/More';
 import { Help } from './features/help/Help';
+import { SessionConfigurator } from './features/program/SessionConfigurator';
+
+const MODE1_HOME_EQUIPMENT: EquipmentId[] = ['chair', 'wall', 'mat'];
 
 const localDateId = () => {
   const date = new Date();
@@ -32,6 +35,7 @@ export function App() {
   const [templates, setTemplates] = useState<FreeSessionTemplate[]>([]);
   const [journals, setJournals] = useState<JournalEntry[]>([]);
   const [tahajjudEntries, setTahajjudEntries] = useState<TahajjudEntry[]>([]);
+  const [exercisePreferences, setExercisePreferences] = useState<ExercisePreference[]>([]);
   const [freeSeed, setFreeSeed] = useState<string>();
   const [journalOpen, setJournalOpen] = useState(false);
   const [toolView, setToolView] = useState<Exclude<MoreView, 'journal'>>();
@@ -39,12 +43,14 @@ export function App() {
   const [loadError, setLoadError] = useState(false);
   const [destination, setDestination] = useState<Destination>('today');
   const [checking, setChecking] = useState(false);
+  const [configuring, setConfiguring] = useState(false);
+  const [configuredPlan, setConfiguredPlan] = useState<PlannedSession>();
   const [running, setRunning] = useState(false);
 
   const refresh = async () => {
     try {
-      const [nextSettings, nextSessions, nextActive, nextTemplates, nextJournals, nextTahajjud] = await Promise.all([repository.getSettings(), repository.listSessions(), repository.getActiveSession(), repository.listTemplates(), repository.listJournalEntries(), repository.listTahajjudEntries()]);
-      setSettings(nextSettings); setSessions(nextSessions); setActive(nextActive); setTemplates(nextTemplates); setJournals(nextJournals); setTahajjudEntries(nextTahajjud); setLoadError(false);
+      const [nextSettings, nextSessions, nextActive, nextTemplates, nextJournals, nextTahajjud, nextPreferences] = await Promise.all([repository.getSettings(), repository.listSessions(), repository.getActiveSession(), repository.listTemplates(), repository.listJournalEntries(), repository.listTahajjudEntries(), repository.listExercisePreferences()]);
+      setSettings(nextSettings); setSessions(nextSessions); setActive(nextActive); setTemplates(nextTemplates); setJournals(nextJournals); setTahajjudEntries(nextTahajjud); setExercisePreferences(nextPreferences); setLoadError(false);
     } catch { setLoadError(true); }
   };
 
@@ -58,15 +64,17 @@ export function App() {
   if (journalOpen) return <Journal today={localDateId()} entries={journals} onBack={() => setJournalOpen(false)} onSave={async (entry) => { await repository.saveJournalEntry(entry); setJournals(await repository.listJournalEntries()); }} />;
   if (toolView === 'tahajjud') return <Tahajjud settings={settings} today={localDateId()} entries={tahajjudEntries} onBack={() => setToolView(undefined)} onSettingsChange={updateSettings} onSaveEntry={async (entry) => { await repository.saveTahajjudEntry(entry); setTahajjudEntries(await repository.listTahajjudEntries()); }} />;
   if (toolView === 'reminders') return <Reminders settings={settings} today={localDateId()} onBack={() => setToolView(undefined)} onChange={updateSettings} />;
-  if (checking) return <ReadinessCheck onCancel={() => setChecking(false)} onClear={async () => {
+  if (configuring && configuredPlan) return <SessionConfigurator plan={configuredPlan} preferences={exercisePreferences} ownedEquipment={MODE1_HOME_EQUIPMENT} onCancel={() => { setConfiguring(false); setConfiguredPlan(undefined); }} onContinue={(plan) => { setConfiguredPlan(plan); setConfiguring(false); setChecking(true); }} onSavePreference={async (preference) => { await repository.saveExercisePreference(preference); setExercisePreferences(await repository.listExercisePreferences()); }} />;
+  if (checking) return <ReadinessCheck backLabel={configuredPlan ? 'Kembali ke pengaturan' : 'Kembali'} onCancel={() => { setChecking(false); if (configuredPlan && !active) setConfiguring(true); }} onClear={async () => {
     let current = active;
     if (!current) {
-      const plan = getTodayPlan(new Date(), settings.programWeek);
+      const plan = configuredPlan ?? getTodayPlan(new Date(), settings.programWeek);
       current = { id: 'active', date: plan.date, plan, source: 'program', itemIndex: 0, completedItemIds: [], skippedItemIds: [], startedAt: new Date().toISOString(), timerStartedAt: new Date().toISOString(), elapsedBeforeTimer: 0 };
       await repository.saveActiveSession(current);
       setActive(current);
     }
     setChecking(false);
+    setConfiguredPlan(undefined);
     setRunning(true);
   }} />;
   if (running && active) return <SessionRunner initial={active} repository={repository} videoConsent={settings.videoConsent} onExit={() => setRunning(false)} onFinish={async () => { setRunning(false); await refresh(); setDestination('progress'); }} />;
@@ -76,7 +84,7 @@ export function App() {
   const startFreeSession = async (template: FreeSessionTemplate) => {
     const plan = createFreePlan(template, localDateId(), settings.programWeek);
     const current: ActiveSession = { id: 'active', date: plan.date, plan, source: 'free', templateId: template.id, itemIndex: 0, completedItemIds: [], skippedItemIds: [], startedAt: new Date().toISOString(), timerStartedAt: new Date().toISOString(), elapsedBeforeTimer: 0 };
-    await repository.saveActiveSession(current); setActive(current); setChecking(true);
+    await repository.saveActiveSession(current); setActive(current); setConfiguredPlan(undefined); setChecking(true);
   };
   const downloadBackup = async () => {
     const content = await exportBackup(repository);
@@ -107,7 +115,7 @@ export function App() {
   if (toolView === 'help') return <Help onBack={() => setToolView(undefined)} />;
 
   return <AppShell destination={destination} onNavigate={setDestination}>
-    {destination === 'today' && <Today settings={settings} active={active} journal={journals.find((entry) => entry.id === localDateId())} onStart={() => setChecking(true)} onOpenJournal={() => setJournalOpen(true)} />}
+    {destination === 'today' && <Today settings={settings} active={active} journal={journals.find((entry) => entry.id === localDateId())} onStart={() => { if (active) setRunning(true); else { setConfiguredPlan(getTodayPlan(new Date(), settings.programWeek)); setConfiguring(true); } }} onOpenJournal={() => setJournalOpen(true)} />}
     {destination === 'library' && <MovementLibrary videoConsent={settings.videoConsent} onAddToFreeSession={(exerciseId) => { setFreeSeed(exerciseId); setDestination('free'); }} />}
     {destination === 'free' && <FreeSessionBuilder templates={templates} initialExerciseId={freeSeed} onSave={saveTemplate} onDelete={deleteTemplate} onStart={startFreeSession} />}
     {destination === 'progress' && <Progress sessions={sessions} journals={journals} templates={templates} today={localDateId()} />}

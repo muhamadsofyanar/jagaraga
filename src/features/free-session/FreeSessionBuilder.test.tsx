@@ -4,6 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { FreeSessionBuilder } from './FreeSessionBuilder';
 
 describe('FreeSessionBuilder', () => {
+  it('offers all sixty catalog movements', () => {
+    render(<FreeSessionBuilder templates={[]} onSave={() => undefined} onDelete={() => undefined} onStart={() => undefined} />);
+    expect(within(screen.getByLabelText(/pilih gerakan/i)).getAllByRole('option')).toHaveLength(60);
+  });
+
   it('adds, reorders, saves, and starts a valid session', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();

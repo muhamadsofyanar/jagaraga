@@ -1,6 +1,7 @@
-import { MODE1_EXERCISES } from '../domain/mode1';
+import { EXERCISES_BY_ID } from '../catalog';
+import { DIFFICULTIES, EQUIPMENT_IDS, MOVEMENT_GROUPS } from '../catalog/vocabulary';
 import type { ExerciseTarget, FreeSessionTemplate, JournalEntry, TahajjudEntry } from '../domain/types';
-import type { AppSettings, SessionLog } from './db';
+import type { AppSettings, ExercisePreference, PerformedMovement, SessionLog } from './db';
 import { defaultSettings, type ProgressRepository } from './repository';
 
 export interface BackupV1 {
@@ -20,10 +21,24 @@ export interface BackupV2 {
   tahajjudEntries: TahajjudEntry[];
 }
 
+export interface BackupV3 {
+  schemaVersion: 3;
+  exportedAt: string;
+  settings: AppSettings | null;
+  sessions: SessionLog[];
+  journalEntries: JournalEntry[];
+  freeSessionTemplates: FreeSessionTemplate[];
+  tahajjudEntries: TahajjudEntry[];
+  exercisePreferences: ExercisePreference[];
+}
+
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DAYS = new Set(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
-const EXERCISES = new Set(Object.keys(MODE1_EXERCISES));
+const EXERCISES = new Set(Object.keys(EXERCISES_BY_ID));
+const GROUPS = new Set<string>(MOVEMENT_GROUPS);
+const DIFFICULTY_VALUES = new Set<string>(DIFFICULTIES);
+const EQUIPMENT = new Set<string>(EQUIPMENT_IDS);
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const isNumberIn = (value: unknown, min: number, max: number) => typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
 const isIntegerIn = (value: unknown, min: number, max: number) => Number.isInteger(value) && isNumberIn(value, min, max);
@@ -38,8 +53,29 @@ function validateDays(value: unknown) {
 
 function validateTarget(value: unknown): value is ExerciseTarget {
   if (!isObject(value) || typeof value.exerciseId !== 'string' || !EXERCISES.has(value.exerciseId)) return false;
-  const units = ['sets', 'reps', 'seconds', 'minutes'].filter((key) => value[key] !== undefined);
-  return units.length === 1 && isIntegerIn(value[units[0]], 1, 999);
+  const units = ['reps', 'seconds', 'minutes'].filter((key) => value[key] !== undefined);
+  if (units.length !== 1 || !isIntegerIn(value[units[0]], 1, 999)) return false;
+  if (value.sets !== undefined && !isIntegerIn(value.sets, 1, 99)) return false;
+  if (value.plannedExerciseId !== undefined && (typeof value.plannedExerciseId !== 'string' || !EXERCISES.has(value.plannedExerciseId))) return false;
+  return value.difficultyAcknowledged === undefined || typeof value.difficultyAcknowledged === 'boolean';
+}
+
+function validatePerformedMovement(value: unknown): value is PerformedMovement {
+  if (!isObject(value) || typeof value.plannedExerciseId !== 'string' || !EXERCISES.has(value.plannedExerciseId)) return false;
+  if (typeof value.exerciseId !== 'string' || !EXERCISES.has(value.exerciseId) || !['completed', 'skipped'].includes(String(value.status))) return false;
+  if (!validateTarget(value.target) || value.target.exerciseId !== value.exerciseId) return false;
+  if (typeof value.group !== 'string' || !GROUPS.has(value.group) || typeof value.difficulty !== 'string' || !DIFFICULTY_VALUES.has(value.difficulty)) return false;
+  return Array.isArray(value.equipment) && value.equipment.every((item) => typeof item === 'string' && EQUIPMENT.has(item));
+}
+
+function validatePreference(value: unknown): ExercisePreference {
+  assertObject(value);
+  if (typeof value.originalExerciseId !== 'string' || typeof value.replacementExerciseId !== 'string') return fail();
+  const originalExerciseId: string = value.originalExerciseId;
+  const replacementExerciseId: string = value.replacementExerciseId;
+  if (!EXERCISES.has(originalExerciseId) || !EXERCISES.has(replacementExerciseId)) fail();
+  if (EXERCISES_BY_ID[originalExerciseId].group !== EXERCISES_BY_ID[replacementExerciseId].group || !isString(value.updatedAt, 50, 1)) fail();
+  return value as unknown as ExercisePreference;
 }
 
 function validatePlan(value: unknown) {
@@ -77,6 +113,7 @@ function validateSession(value: unknown, legacy: boolean): SessionLog {
     if (sleepHours !== undefined && !isNumberIn(sleepHours, 0, 24)) fail();
     if (note !== undefined && !isString(note, 300)) fail();
   }
+  if (value.performedItems !== undefined && (!Array.isArray(value.performedItems) || value.performedItems.length > 40 || !value.performedItems.every(validatePerformedMovement))) fail();
   return { ...value, source: legacy ? 'program' : value.source } as unknown as SessionLog;
 }
 
@@ -101,42 +138,47 @@ function validateTahajjud(value: unknown): TahajjudEntry {
   return value as unknown as TahajjudEntry;
 }
 
-export function validateAndMigrateBackup(input: unknown): BackupV2 {
+export function validateAndMigrateBackup(input: unknown): BackupV3 {
   assertObject(input);
-  if (![1, 2].includes(Number(input.schemaVersion)) || !isString(input.exportedAt, 50, 1)) fail();
+  if (![1, 2, 3].includes(Number(input.schemaVersion)) || !isString(input.exportedAt, 50, 1)) fail();
   assertArray(input.sessions);
   const legacy = input.schemaVersion === 1;
   const sessions = input.sessions.map((session) => validateSession(session, legacy));
   const settings = validateSettings(input.settings);
-  if (legacy) return { schemaVersion: 2, exportedAt: input.exportedAt as string, settings, sessions, journalEntries: [], freeSessionTemplates: [], tahajjudEntries: [] };
+  if (legacy) return { schemaVersion: 3, exportedAt: input.exportedAt as string, settings, sessions, journalEntries: [], freeSessionTemplates: [], tahajjudEntries: [], exercisePreferences: [] };
   assertArray(input.journalEntries);
   assertArray(input.freeSessionTemplates);
   assertArray(input.tahajjudEntries);
+  const exercisePreferences = input.schemaVersion === 3 ? input.exercisePreferences : [];
+  assertArray(exercisePreferences);
+  const preferences = exercisePreferences.map(validatePreference);
+  if (new Set(preferences.map((item) => item.originalExerciseId)).size !== preferences.length) fail();
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     exportedAt: input.exportedAt as string,
     settings,
     sessions,
     journalEntries: input.journalEntries.map(validateJournal),
     freeSessionTemplates: input.freeSessionTemplates.map(validateTemplate),
     tahajjudEntries: input.tahajjudEntries.map(validateTahajjud),
+    exercisePreferences: preferences,
   };
 }
 
 export const validateBackup = validateAndMigrateBackup;
 
 export async function exportBackup(repository: ProgressRepository): Promise<string> {
-  const [settings, sessions, journalEntries, freeSessionTemplates, tahajjudEntries] = await Promise.all([
+  const [settings, sessions, journalEntries, freeSessionTemplates, tahajjudEntries, exercisePreferences] = await Promise.all([
     repository.db.settings.get('settings'), repository.listSessions(), repository.listJournalEntries(),
-    repository.listTemplates(), repository.listTahajjudEntries(),
+    repository.listTemplates(), repository.listTahajjudEntries(), repository.listExercisePreferences(),
   ]);
-  const backup: BackupV2 = { schemaVersion: 2, exportedAt: new Date().toISOString(), settings: settings ?? null, sessions, journalEntries, freeSessionTemplates, tahajjudEntries };
+  const backup: BackupV3 = { schemaVersion: 3, exportedAt: new Date().toISOString(), settings: settings ?? null, sessions, journalEntries, freeSessionTemplates, tahajjudEntries, exercisePreferences };
   return JSON.stringify(backup, null, 2);
 }
 
 export async function importBackup(repository: ProgressRepository, raw: string) {
   const backup = validateAndMigrateBackup(JSON.parse(raw));
-  const tables = [repository.db.settings, repository.db.sessions, repository.db.activeSessions, repository.db.journalEntries, repository.db.freeSessionTemplates, repository.db.tahajjudEntries];
+  const tables = [repository.db.settings, repository.db.sessions, repository.db.activeSessions, repository.db.journalEntries, repository.db.freeSessionTemplates, repository.db.tahajjudEntries, repository.db.exercisePreferences];
   await repository.db.transaction('rw', tables, async () => {
     await Promise.all(tables.map((table) => table.clear()));
     if (backup.settings) await repository.db.settings.put(backup.settings);
@@ -144,6 +186,7 @@ export async function importBackup(repository: ProgressRepository, raw: string) 
     if (backup.journalEntries.length) await repository.db.journalEntries.bulkPut(backup.journalEntries);
     if (backup.freeSessionTemplates.length) await repository.db.freeSessionTemplates.bulkPut(backup.freeSessionTemplates);
     if (backup.tahajjudEntries.length) await repository.db.tahajjudEntries.bulkPut(backup.tahajjudEntries);
+    if (backup.exercisePreferences.length) await repository.db.exercisePreferences.bulkPut(backup.exercisePreferences);
   });
   return { sessions: backup.sessions.length, journals: backup.journalEntries.length, templates: backup.freeSessionTemplates.length, tahajjud: backup.tahajjudEntries.length };
 }

@@ -1,22 +1,13 @@
-import { useEffect, useState } from 'react';
 import { AlertCircle, Check, ChevronLeft, ChevronRight, Wind } from 'lucide-react';
-import { MODE1_EXERCISES } from '../domain/mode1';
+import { EXERCISES_BY_ID } from '../catalog';
 import type { ExerciseTarget } from '../domain/types';
+import { MovementVisual } from '../features/library/MovementVisual';
 import { VideoEmbed } from '../media/VideoEmbed';
 import { VIDEO_REGISTRY } from '../media/videos';
 
-function MovementVisual({ src, title }: { src: string; title: string }) {
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => setFailed(false), [src]);
-
-  if (failed) return <div className="movement-image-fallback" role="status">Ilustrasi {title} tidak dapat dimuat.</div>;
-  return <img className="movement-image" src={src} alt={`Contoh ${title}`} onError={() => setFailed(true)} />;
-}
-
 export function ExerciseCard({ target, index, total, consent, onPrevious, onComplete, onSkip }: { target: ExerciseTarget; index: number; total: number; consent: boolean; onPrevious: () => void; onComplete: () => void; onSkip: () => void }) {
-  const item = MODE1_EXERCISES[target.exerciseId];
-  const video = item.videoId ? VIDEO_REGISTRY[item.videoId] : target.exerciseId === 'walk' ? VIDEO_REGISTRY['senam-low-impact'] : undefined;
+  const item = EXERCISES_BY_ID[target.exerciseId];
+  const video = item.videoId ? VIDEO_REGISTRY[item.videoId] : undefined;
   const targetText = target.minutes ? `${target.minutes} menit` : target.seconds ? `${target.seconds} detik` : `${target.sets ?? 1} set × ${target.reps ?? 8} kali`;
   return <div className="session-page">
     <div className="session-progress"><span style={{ width: `${((index + 1) / total) * 100}%` }} /></div>

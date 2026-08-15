@@ -1,4 +1,4 @@
-import type { ActiveSession, AppSettings, SessionLog } from './db';
+import type { ActiveSession, AppSettings, ExercisePreference, SessionLog } from './db';
 import type { FreeSessionTemplate, JournalEntry, TahajjudEntry } from '../domain/types';
 import { JagaRagaDB, appDb } from './db';
 
@@ -60,6 +60,9 @@ export class ProgressRepository {
   async deleteTemplate(id: string) { await this.db.freeSessionTemplates.delete(id); }
   async listTahajjudEntries() { return this.db.tahajjudEntries.orderBy('id').toArray(); }
   async saveTahajjudEntry(entry: TahajjudEntry) { await this.db.tahajjudEntries.put(entry); }
+  async listExercisePreferences() { return this.db.exercisePreferences.orderBy('updatedAt').toArray(); }
+  async saveExercisePreference(preference: ExercisePreference) { await this.db.exercisePreferences.put(preference); }
+  async deleteExercisePreference(originalExerciseId: string) { await this.db.exercisePreferences.delete(originalExerciseId); }
 
   async completeSession(log: SessionLog) {
     await this.db.transaction('rw', this.db.sessions, this.db.activeSessions, async () => {
@@ -69,10 +72,11 @@ export class ProgressRepository {
   }
 
   async reset() {
-    await this.db.transaction('rw', [this.db.settings, this.db.sessions, this.db.activeSessions, this.db.journalEntries, this.db.freeSessionTemplates, this.db.tahajjudEntries], async () => {
+    await this.db.transaction('rw', [this.db.settings, this.db.sessions, this.db.activeSessions, this.db.journalEntries, this.db.freeSessionTemplates, this.db.tahajjudEntries, this.db.exercisePreferences], async () => {
       await Promise.all([
         this.db.settings.clear(), this.db.sessions.clear(), this.db.activeSessions.clear(),
         this.db.journalEntries.clear(), this.db.freeSessionTemplates.clear(), this.db.tahajjudEntries.clear(),
+        this.db.exercisePreferences.clear(),
       ]);
     });
   }

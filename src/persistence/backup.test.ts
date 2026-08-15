@@ -5,7 +5,7 @@ import { exportBackup, importBackup, validateAndMigrateBackup } from './backup';
 import { JagaRagaDB, type SessionLog } from './db';
 import { defaultSettings, ProgressRepository } from './repository';
 
-describe('backup version 2', () => {
+describe('backup version 3', () => {
   let db: JagaRagaDB;
   let repository: ProgressRepository;
 
@@ -25,13 +25,14 @@ describe('backup version 2', () => {
       sessions: [{ id: plan.date, date: plan.date, plan, status: 'completed', completedItemIds: [], skippedItemIds: [], elapsedSeconds: 60, updatedAt: '2026-08-15T00:00:00.000Z' }],
     });
 
-    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.schemaVersion).toBe(3);
     expect(migrated.sessions[0].source).toBe('program');
     expect(migrated.journalEntries).toEqual([]);
     expect(migrated.settings?.reminder.trainingTime).toBe('06:00');
+    expect(migrated.exercisePreferences).toEqual([]);
   });
 
-  it('round-trips all schema 2 collections', async () => {
+  it('round-trips all schema 3 collections', async () => {
     const now = '2026-08-15T00:00:00.000Z';
     const plan = getTodayPlan(new Date(2026, 7, 17), 1);
     const session = { id: plan.date, date: plan.date, plan, source: 'program', status: 'completed', completedItemIds: ['march'], skippedItemIds: [], elapsedSeconds: 60, updatedAt: now } satisfies SessionLog;
@@ -44,6 +45,8 @@ describe('backup version 2', () => {
     await repository.saveJournalEntry(journal);
     await repository.saveTemplate(template);
     await repository.saveTahajjudEntry(tahajjud);
+    const preference = { originalExerciseId: 'chair-squat', replacementExerciseId: 'sit-to-stand', updatedAt: now };
+    await repository.saveExercisePreference(preference);
     const raw = await exportBackup(repository);
     await repository.reset();
 
@@ -52,6 +55,25 @@ describe('backup version 2', () => {
     expect(await repository.listJournalEntries()).toEqual([journal]);
     expect(await repository.listTemplates()).toEqual([template]);
     expect(await repository.listTahajjudEntries()).toEqual([tahajjud]);
+    expect(await repository.listExercisePreferences()).toEqual([preference]);
+  });
+
+  it.each([
+    { schemaVersion: 1, exportedAt: '2026-08-15T00:00:00.000Z', settings: null, sessions: [] },
+    { schemaVersion: 2, exportedAt: '2026-08-15T00:00:00.000Z', settings: null, sessions: [], journalEntries: [], freeSessionTemplates: [], tahajjudEntries: [] },
+    { schemaVersion: 3, exportedAt: '2026-08-15T00:00:00.000Z', settings: null, sessions: [], journalEntries: [], freeSessionTemplates: [], tahajjudEntries: [], exercisePreferences: [] },
+  ])('migrates schema $schemaVersion atomically to schema 3', (input) => {
+    const result = validateAndMigrateBackup(input);
+    expect(result.schemaVersion).toBe(3);
+    expect(result.exercisePreferences).toBeDefined();
+  });
+
+  it('rejects invalid cross-group preferences before clearing current data', async () => {
+    const plan = getTodayPlan(new Date(2026, 7, 17), 1);
+    await repository.saveSession({ id: plan.date, date: plan.date, plan, source: 'program', status: 'completed', completedItemIds: [], skippedItemIds: [], elapsedSeconds: 60, updatedAt: '2026-08-15T00:00:00.000Z' });
+    const raw = JSON.stringify({ schemaVersion: 3, exportedAt: '2026-08-15T00:00:00.000Z', settings: null, sessions: [], journalEntries: [], freeSessionTemplates: [], tahajjudEntries: [], exercisePreferences: [{ originalExerciseId: 'chair-squat', replacementExerciseId: 'wall-pushup', updatedAt: '2026-08-15T00:00:00.000Z' }] });
+    await expect(importBackup(repository, raw)).rejects.toThrow('Data cadangan tidak valid');
+    expect(await repository.listSessions()).toHaveLength(1);
   });
 
   it('rejects invalid input before changing existing data', async () => {

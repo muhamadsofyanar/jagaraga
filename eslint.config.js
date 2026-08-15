@@ -7,5 +7,6 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   { files: ['**/*.{ts,tsx}'], languageOptions: { globals: { ...globals.browser, ...globals.node } }, rules: { '@typescript-eslint/no-explicit-any': 'off' } },
+  { files: ['scripts/**/*.mjs'], languageOptions: { globals: globals.node } },
   { files: ['public/sw.js'], languageOptions: { globals: globals.serviceworker } },
 );

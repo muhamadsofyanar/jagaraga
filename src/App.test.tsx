@@ -34,6 +34,15 @@ test('shows five destinations and opens the movement library', async () => {
   expect(screen.getByRole('heading', { name: /pustaka gerakan/i })).toBeVisible();
 });
 
+test('opens the sixty-item local catalog from the app shell', async () => {
+  await repository.saveSettings({ ...(await repository.getSettings()), onboardingComplete: true });
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(await screen.findByRole('button', { name: /^pustaka$/i }));
+  expect(screen.getByText(/60 gerakan lokal/i)).toBeInTheDocument();
+  expect([...document.querySelectorAll('img')].every((image) => image.getAttribute('src')?.startsWith('/movement/') ?? true)).toBe(true);
+});
+
 test('adds a library movement to the free session builder', async () => {
   await repository.saveSettings({ ...(await repository.getSettings()), onboardingComplete: true });
   const user = userEvent.setup();
@@ -44,6 +53,32 @@ test('adds a library movement to the free session builder', async () => {
   await user.click(screen.getByRole('button', { name: /tambah ke sesi bebas/i }));
   expect(screen.getByRole('heading', { name: /sesi bebas/i })).toBeVisible();
   expect(screen.getByRole('heading', { name: 'Putaran bahu' })).toBeVisible();
+});
+
+test('configures a fresh program session before readiness and persistence', async () => {
+  await repository.saveSettings({ ...(await repository.getSettings()), onboardingComplete: true });
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(await screen.findByRole('button', { name: /mulai latihan/i }));
+  expect(screen.getByRole('heading', { name: /atur sesi hari ini/i })).toBeVisible();
+  expect(await repository.getActiveSession()).toBeUndefined();
+  await user.click(screen.getByRole('button', { name: /lanjut pemeriksaan kesiapan/i }));
+  expect(screen.getByRole('heading', { name: /siap bergerak/i })).toBeVisible();
+  expect(await repository.getActiveSession()).toBeUndefined();
+  await user.click(screen.getByRole('button', { name: /mulai latihan/i }));
+  await waitFor(async () => expect(await repository.getActiveSession()).toBeDefined());
+});
+
+test('resumes an existing active session without reopening configuration', async () => {
+  const settings = { ...(await repository.getSettings()), onboardingComplete: true };
+  await repository.saveSettings(settings);
+  const plan = (await import('./domain/schedule')).getTodayPlan(new Date(), settings.programWeek);
+  await repository.saveActiveSession({ id: 'active', date: plan.date, plan, source: 'program', itemIndex: 0, completedItemIds: [], skippedItemIds: [], startedAt: new Date().toISOString(), elapsedBeforeTimer: 0 });
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(await screen.findByRole('button', { name: /lanjutkan sesi/i }));
+  expect(screen.queryByRole('heading', { name: /atur sesi hari ini/i })).not.toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Jalan di tempat' })).toBeVisible();
 });
 
 test('opens the body journal from today and saves locally', async () => {

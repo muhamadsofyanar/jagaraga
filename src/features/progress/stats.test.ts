@@ -15,6 +15,16 @@ describe('buildProgressStats', () => {
     expect(stats.sessionSources).toEqual({ program: 2, free: 1 });
     expect(stats.categoryCounts.strength).toBe(1);
     expect(stats.categoryCounts.balance).toBe(1);
+    expect(stats.substitutionCount).toBe(0);
+  });
+
+  it('counts actual performed replacements while keeping legacy fallback stable', () => {
+    const current = session('2026-08-15', 'program', 600, ['sit-to-stand']);
+    current.performedItems = [{ plannedExerciseId: 'chair-squat', exerciseId: 'sit-to-stand', status: 'completed', target: { exerciseId: 'sit-to-stand', sets: 1, reps: 8 }, group: 'lower-strength', difficulty: 'light', equipment: ['chair'] }];
+    const stats = buildProgressStats([current, session('2026-08-14', 'program', 600, ['walk'])], [], [], '2026-08-15');
+    expect(stats.categoryCounts.strength).toBe(1);
+    expect(stats.categoryCounts.cardio).toBe(1);
+    expect(stats.substitutionCount).toBe(1);
   });
 
   it('uses real calendar dates and recent journal windows', () => {

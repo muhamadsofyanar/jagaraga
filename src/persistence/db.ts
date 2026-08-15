@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { DayKey, FreeSessionTemplate, JournalEntry, PlannedSession, SessionSource, TahajjudEntry } from '../domain/types';
+import type { DayKey, Difficulty, EquipmentId, ExerciseTarget, FreeSessionTemplate, JournalEntry, MovementGroup, PlannedSession, SessionSource, TahajjudEntry } from '../domain/types';
 
 export interface ReminderSettings {
   enabled: boolean;
@@ -36,6 +36,22 @@ export interface WellnessEntry {
   note?: string;
 }
 
+export interface ExercisePreference {
+  originalExerciseId: string;
+  replacementExerciseId: string;
+  updatedAt: string;
+}
+
+export interface PerformedMovement {
+  plannedExerciseId: string;
+  exerciseId: string;
+  status: 'completed' | 'skipped';
+  target: ExerciseTarget;
+  group: MovementGroup;
+  difficulty: Difficulty;
+  equipment: EquipmentId[];
+}
+
 export interface SessionLog {
   id: string;
   date: string;
@@ -48,6 +64,7 @@ export interface SessionLog {
   elapsedSeconds: number;
   wellness?: WellnessEntry;
   warningFlag?: boolean;
+  performedItems?: PerformedMovement[];
   updatedAt: string;
 }
 
@@ -72,6 +89,7 @@ export class JagaRagaDB extends Dexie {
   journalEntries!: EntityTable<JournalEntry, 'id'>;
   freeSessionTemplates!: EntityTable<FreeSessionTemplate, 'id'>;
   tahajjudEntries!: EntityTable<TahajjudEntry, 'id'>;
+  exercisePreferences!: EntityTable<ExercisePreference, 'originalExerciseId'>;
 
   constructor(name = 'jagaraga') {
     super(name);
@@ -86,6 +104,15 @@ export class JagaRagaDB extends Dexie {
     }).upgrade(async (transaction) => {
       await transaction.table('sessions').toCollection().modify((row) => { row.source ??= 'program'; });
       await transaction.table('activeSessions').toCollection().modify((row) => { row.source ??= 'program'; });
+    });
+    this.version(3).stores({
+      settings: 'id',
+      sessions: 'id,date,status,source',
+      activeSessions: 'id,date,source',
+      journalEntries: 'id,updatedAt',
+      freeSessionTemplates: 'id,updatedAt',
+      tahajjudEntries: 'id,updatedAt',
+      exercisePreferences: 'originalExerciseId,replacementExerciseId,updatedAt',
     });
   }
 }

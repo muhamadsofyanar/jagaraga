@@ -15,6 +15,7 @@ export function Today({ settings, active, journal, onStart, onOpenJournal }: { s
       <div className="hero-kicker"><Sparkles size={16} /> SESI HARI INI</div>
       <h2>{plan.title}</h2><p>{plan.description}</p>
       <div className="hero-meta"><span><Clock3 size={18} /> ± {plan.estimatedMinutes} menit</span><span><Footprints size={18} /> Intensitas ringan</span></div>
+      <small className="hero-plan-note">{active ? 'Sesi tersimpan akan dibuka kembali.' : 'Gerakan dan alat dapat diatur sebelum mulai.'}</small>
       <button className="hero-button" onClick={onStart}>{active ? 'Lanjutkan sesi' : 'Mulai latihan'} <ArrowRight size={20} /></button>
     </section>
     <section className="daily-focus"><div className="section-heading"><div><p className="eyebrow">TARGET HARI INI</p><h2>Pelan tetapi selesai</h2></div><CalendarCheck size={24} /></div>
