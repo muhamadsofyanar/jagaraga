@@ -20,7 +20,7 @@ export function SessionRunner({ initial, repository, videoConsent, onFinish, onE
   const complete = () => { dispatch({ type: 'COMPLETE_ITEM', id: current.exerciseId }); if (isLast) setFinishing(true); };
   const skip = () => { dispatch({ type: 'SKIP_ITEM', id: current.exerciseId }); if (isLast) setFinishing(true); };
   const save = async (wellness: WellnessEntry) => {
-    await repository.completeSession({ id: state.date, date: state.date, plan: state.plan, status: 'completed', completedItemIds: [...new Set([...state.completedItemIds, current.exerciseId])], skippedItemIds: state.skippedItemIds, elapsedSeconds: getElapsedSeconds(state), wellness, updatedAt: new Date().toISOString() });
+    await repository.completeSession({ id: state.date, date: state.date, plan: state.plan, source: state.source, templateId: state.templateId, status: 'completed', completedItemIds: [...new Set([...state.completedItemIds, current.exerciseId])], skippedItemIds: state.skippedItemIds, elapsedSeconds: getElapsedSeconds(state), wellness, updatedAt: new Date().toISOString() });
     onFinish();
   };
   if (finishing) return <WellnessForm onSubmit={save} />;

@@ -9,6 +9,8 @@ export type DayKey =
 
 export type ProgramWeek = 1 | 2 | 3 | 4;
 export type ExerciseKind = 'warmup' | 'cardio' | 'strength' | 'balance' | 'cooldown' | 'recovery';
+export type SessionSource = 'program' | 'free';
+export type BreathlessnessLevel = 'none' | 'exercise' | 'ordinary';
 
 export interface Exercise {
   id: string;
@@ -45,4 +47,33 @@ export interface PlannedSession extends SessionDefinition {
   date: string;
   day: DayKey;
   programWeek: ProgramWeek;
+}
+
+export interface JournalEntry {
+  id: string;
+  energy: 1 | 2 | 3 | 4 | 5;
+  soreness: number;
+  sleepQuality: 1 | 2 | 3 | 4 | 5;
+  stress: 1 | 2 | 3 | 4 | 5;
+  breathlessness: BreathlessnessLevel;
+  note: string;
+  updatedAt: string;
+}
+
+export interface FreeSessionTemplate {
+  id: string;
+  name: string;
+  items: ExerciseTarget[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TahajjudEntry {
+  id: string;
+  sleptOnTime: boolean;
+  wokeOnTime: boolean;
+  prayed: boolean;
+  readiness: 1 | 2 | 3 | 4 | 5;
+  note: string;
+  updatedAt: string;
 }

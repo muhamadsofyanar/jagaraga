@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react';
-import { CalendarDays, ChartNoAxesColumnIncreasing, Home, Settings } from 'lucide-react';
+import { BookOpen, ChartNoAxesColumnIncreasing, Dumbbell, Home, MoreHorizontal } from 'lucide-react';
 
-export type Destination = 'today' | 'program' | 'progress' | 'settings';
+export type Destination = 'today' | 'library' | 'free' | 'progress' | 'more';
 
 const items = [
   { id: 'today' as const, label: 'Hari Ini', Icon: Home },
-  { id: 'program' as const, label: 'Program', Icon: CalendarDays },
+  { id: 'library' as const, label: 'Pustaka', Icon: BookOpen },
+  { id: 'free' as const, label: 'Sesi Bebas', Icon: Dumbbell },
   { id: 'progress' as const, label: 'Progres', Icon: ChartNoAxesColumnIncreasing },
-  { id: 'settings' as const, label: 'Pengaturan', Icon: Settings },
+  { id: 'more' as const, label: 'Lainnya', Icon: MoreHorizontal },
 ];
 
 export function AppShell({ destination, onNavigate, children }: { destination: Destination; onNavigate: (value: Destination) => void; children: ReactNode }) {

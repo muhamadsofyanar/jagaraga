@@ -3,7 +3,7 @@ import { getTodayPlan } from '../domain/schedule';
 import type { ActiveSession } from '../persistence/db';
 import { getElapsedSeconds, sessionReducer } from './reducer';
 
-const active = (): ActiveSession => ({ id: 'active', date: '2026-08-17', plan: getTodayPlan(new Date(2026, 7, 17), 1), itemIndex: 0, completedItemIds: [], skippedItemIds: [], startedAt: '2026-08-17T00:00:00.000Z', elapsedBeforeTimer: 10 });
+const active = (): ActiveSession => ({ id: 'active', date: '2026-08-17', plan: getTodayPlan(new Date(2026, 7, 17), 1), source: 'program', itemIndex: 0, completedItemIds: [], skippedItemIds: [], startedAt: '2026-08-17T00:00:00.000Z', elapsedBeforeTimer: 10 });
 
 describe('session reducer', () => {
   it('completes an item once and moves forward', () => {
