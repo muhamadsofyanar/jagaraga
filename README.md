@@ -27,6 +27,12 @@ npm run build
 - Tidak ada iklan, analitik, akun, GPS, atau data latihan yang dikirim ke server.
 - Video pihak ketiga hanya dimuat setelah persetujuan dan menggunakan pemutar sumber aslinya. Video tidak diunduh, diubah, atau di-cache oleh JagaRaga.
 
+## Media panduan
+
+- Setiap gerakan Mode 1 memiliki ilustrasi lokal dua fase yang tetap tersedia tanpa internet.
+- Ilustrasi menggunakan karakter laki-laki dewasa dengan gaya visual yang konsisten.
+- Video resmi merupakan panduan tambahan untuk gerakan tertentu dan hanya dimuat ketika pengguna mengizinkannya serta perangkat sedang online.
+
 ## Docker
 
 ```bash

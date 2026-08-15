@@ -1,4 +1,4 @@
-const CACHE = 'jagaraga-v1';
+const CACHE = 'jagaraga-v2';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {

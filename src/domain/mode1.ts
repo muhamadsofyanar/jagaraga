@@ -23,7 +23,7 @@ const exercise = (
   commonMistakes,
   beginnerModification,
   stopCondition,
-  illustration: `/movement/${id}.svg`,
+  illustration: `/movement/${id}.png`,
   videoId,
 });
 
